@@ -11,6 +11,7 @@ import { dirname } from "path";
 // Import routes and handlers
 import authRoutes from "./routes/authRoutes.js";
 import adminManagementRoutes from "./routes/adminRoutes.js";
+import appleRoutes from "./routes/appleRoutes.js"; // ✅ NEW: Add this line
 import { handleSignupRequest } from "./signupHandler.js";
 import { Admin } from "./models/Admin.js";
 
@@ -72,7 +73,8 @@ app.get("/", (req, res) => {
     message: "🍎 Appleverse API is running!",
     endpoints: {
       user_auth: "/api/auth/*",
-      admin_auth: "/api/admin/*"
+      admin_auth: "/api/admin/*",
+      apples: "/api/apples/*" // ✅ NEW: Add this line
     }
   });
 });
@@ -148,6 +150,12 @@ app.post("/api/admin/login", async (req, res) => {
 app.use("/api/admin", adminManagementRoutes);
 
 // ========================
+// APPLE ROUTES (Apple CRUD Operations)
+// ✅ NEW: Add this entire section
+// ========================
+app.use("/api/apples", appleRoutes);
+
+// ========================
 // STATIC FILES
 // ========================
 app.use("/images", express.static(path.join(__dirname, "images")));
@@ -184,7 +192,8 @@ app.listen(PORT, () => {
   console.log(`📱 User Auth API: http://localhost:${PORT}/api/auth`);
   console.log(`👨‍💼 Admin Login: http://localhost:${PORT}/api/admin/login`);
   console.log(`📊 Admin Dashboard API: http://localhost:${PORT}/api/admin/pending-requests`);
-  console.log(`📊 Admin Dashboard API: http://localhost:${PORT}/api/admin/admins\n`);
+  console.log(`📊 Admin Dashboard API: http://localhost:${PORT}/api/admin/admins`);
+  console.log(`🍎 Apple API: http://localhost:${PORT}/api/apples\n`); // ✅ NEW: Add this line
 });
 
 // Handle unhandled promise rejections

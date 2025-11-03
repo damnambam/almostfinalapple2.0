@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navigation from './components/Navigation';
 import HeroSection from './components/HeroSection';
-import SearchSection from './components/SearchSection';
 import FeaturesGrid from './components/FeaturesGrid';
 import AdvancedFilters from './components/AdvancedFilters';
 import SearchResults from './components/SearchResults';
@@ -12,35 +11,24 @@ import AdminDashboard from './components/AdminDashboard';
 import UserDashboard from './pages/UserDashboard';
 import Footer from './components/Footer';
 import CreateApple from './pages/CreateApple';
+import SingleApple from './pages/SingleApple';
 import SignupLogin from "./pages/SignupLogin";
+
 import './App.css';
 
-// Protected Route Component for Admin
+// 🔒 Protected Route for Admin
 const ProtectedAdminRoute = ({ children }) => {
   const isAdmin = localStorage.getItem('isAdmin') === 'true';
   const adminToken = localStorage.getItem('adminToken');
-  
-  console.log('🔒 ProtectedAdminRoute check:', { isAdmin, hasToken: !!adminToken });
-  
-  if (!isAdmin || !adminToken) {
-    console.log('❌ Access denied - redirecting to login');
-    return <Navigate to="/signup-login" replace />;
-  }
-  
-  console.log('✅ Access granted to admin dashboard');
+  if (!isAdmin || !adminToken) return <Navigate to="/signup-login" replace />;
   return children;
 };
 
-// Protected Route Component for User Dashboard
+// 🔒 Protected Route for Users
 const ProtectedUserRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   const user = localStorage.getItem('user');
-  
-  if (!token || !user) {
-    console.log('❌ User not logged in - redirecting to login');
-    return <Navigate to="/signup-login" replace />;
-  }
-  
+  if (!token || !user) return <Navigate to="/signup-login" replace />;
   return children;
 };
 
@@ -52,96 +40,31 @@ function App() {
   const [hasSearched, setHasSearched] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Check admin status on mount
+  // ✅ Check admin status on mount
   useEffect(() => {
     const adminStatus = localStorage.getItem('isAdmin') === 'true';
     setIsAdmin(adminStatus);
-    console.log('🔐 App mounted, admin status:', adminStatus);
   }, []);
 
-  // Listen for auth changes
+  // ✅ Listen for login/logout changes
   useEffect(() => {
     const handleAuthChange = () => {
       const adminStatus = localStorage.getItem('isAdmin') === 'true';
       setIsAdmin(adminStatus);
-      console.log('🔄 Auth changed, admin status:', adminStatus);
     };
-
     window.addEventListener('authChange', handleAuthChange);
     return () => window.removeEventListener('authChange', handleAuthChange);
   }, []);
 
   // ✅ Mock search data
   const mockResults = [
-    {
-      id: 1,
-      name: 'Honeycrisp',
-      origin: 'Minnesota, USA',
-      originFlag: '🇺🇸',
-      taste: 'Sweet',
-      texture: 'Extra Crisp',
-      uses: ['Fresh Eating', 'Salads', 'Desserts'],
-      description:
-        'Exceptionally crisp and juicy with a perfect balance of sweetness and tartness. Known for its explosive crunch.',
-      harvestSeason: 'Late September',
-      hardiness: 'Zone 3-6',
-      storage: '4-6 months',
-      color: '#ff6b6b',
-      secondaryColor: '#ffa726',
-      emoji: '🍎',
-    },
-    {
-      id: 2,
-      name: 'Granny Smith',
-      origin: 'Australia',
-      originFlag: '🇦🇺',
-      taste: 'Tart',
-      texture: 'Firm',
-      uses: ['Baking', 'Cooking', 'Fresh Eating'],
-      description:
-        'Bright green with a very tart flavor. Excellent for baking as it holds its shape well when cooked.',
-      harvestSeason: 'October',
-      hardiness: 'Zone 6-9',
-      storage: '5-7 months',
-      color: '#66bb6a',
-      secondaryColor: '#4caf50',
-      emoji: '🍏',
-    },
-    {
-      id: 3,
-      name: 'Gala',
-      origin: 'New Zealand',
-      originFlag: '🇳🇿',
-      taste: 'Sweet',
-      texture: 'Crisp',
-      uses: ['Fresh Eating', 'Salads', 'Sauces'],
-      description: 'Mild, sweet, and aromatic with a thin skin. A great everyday eating apple.',
-      harvestSeason: 'Mid August',
-      hardiness: 'Zone 5-8',
-      storage: '3-4 months',
-      color: '#ffcc80',
-      secondaryColor: '#ffb74d',
-      emoji: '🍎',
-    },
-    {
-      id: 4,
-      name: 'McIntosh',
-      origin: 'Canada',
-      originFlag: '🇨🇦',
-      taste: 'Tart-Sweet',
-      texture: 'Tender',
-      uses: ['Sauces', 'Juice', 'Fresh Eating'],
-      description: 'Classic Canadian apple with tender white flesh and distinctive tart-sweet flavor.',
-      harvestSeason: 'September',
-      hardiness: 'Zone 4-7',
-      storage: '2-3 months',
-      color: '#ef5350',
-      secondaryColor: '#e57373',
-      emoji: '🍎',
-    },
+    { id: 1, name: 'Honeycrisp', origin: 'Minnesota, USA', taste: 'Sweet', emoji: '🍎' },
+    { id: 2, name: 'Granny Smith', origin: 'Australia', taste: 'Tart', emoji: '🍏' },
+    { id: 3, name: 'Gala', origin: 'New Zealand', taste: 'Sweet', emoji: '🍎' },
+    { id: 4, name: 'McIntosh', origin: 'Canada', taste: 'Tart-Sweet', emoji: '🍎' },
   ];
 
-  // ✅ Search logic
+  // ✅ Search Logic
   const performSearch = (query) => {
     if (!query) return mockResults;
     const q = query.toLowerCase();
@@ -183,26 +106,23 @@ function App() {
 
   return (
     <Router>
-      <Navigation
-        isAdmin={isAdmin}
-        onLogout={handleLogout}
-      />
+      <Navigation isAdmin={isAdmin} onLogout={handleLogout} />
 
       <Routes>
-        {/* ✅ Signup/Login Page */}
+        {/* 🔐 Auth Pages */}
         <Route path="/signup-login" element={<SignupLogin setIsAdmin={setIsAdmin} />} />
 
-        {/* ✅ User Dashboard - Protected */}
-        <Route 
-          path="/user-dashboard" 
+        {/* 🔐 User Dashboard */}
+        <Route
+          path="/user-dashboard"
           element={
             <ProtectedUserRoute>
               <UserDashboard />
             </ProtectedUserRoute>
-          } 
+          }
         />
 
-        {/* ✅ Admin Dashboard - Protected */}
+        {/* 🔐 Admin Dashboard */}
         <Route
           path="/dashboard"
           element={
@@ -212,30 +132,20 @@ function App() {
           }
         />
 
-        {/* ✅ Create Apple Page */}
-        <Route path="/createapple" element={<CreateApple />} />
+        {/* 🍎 Apple Upload Routes */}
+        <Route path="/create-apple" element={<CreateApple />} />
+        <Route path="/single-apple" element={<SingleApple />} />
+        <Route path="/template-creator" element={<TemplateCreator />} />
 
-        {/* ✅ Template Creator Page */}
-        <Route path="/templates" element={<TemplateCreator />} />
-
-        {/* ✅ About Page */}
+        {/* 🌳 About Page */}
         <Route path="/about" element={<TreeScrollPage />} />
 
-        {/* ✅ Home Page */}
+        {/* 🏠 Home Page */}
         <Route
           path="/"
           element={
             <>
               <HeroSection />
-              <SearchSection
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                onShowAdvancedFilters={() => setShowAdvancedFilters(true)}
-                onSearch={handleSearch}
-                onClearSearch={handleClearSearch}
-                isSearching={isSearching}
-                hasSearched={hasSearched}
-              />
               {hasSearched ? (
                 <SearchResults
                   query={searchQuery}

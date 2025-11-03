@@ -34,34 +34,16 @@ const UserDashboard = () => {
         <div className="dashboard-header">
           <div>
             <h1 className="dashboard-title">
-              Welcome back, {user.name || user.email}! 👋
+              Hello, {user.name || user.email}! 👋
             </h1>
             <p className="dashboard-subtitle">
-              Explore apple varieties, manage your profile, and discover new favorites.
+              Explore apple varieties, manage your profile, and download your favorites.
             </p>
           </div>
-          <button onClick={handleLogout} className="logout-btn">
-            Logout
-          </button>
+          
         </div>
 
-        {/* User Info Card */}
-        <div className="user-info-card">
-          <div className="user-avatar">
-            {user.profilePicture ? (
-              <img src={user.profilePicture} alt={user.name} />
-            ) : (
-              <div className="avatar-placeholder">
-                {(user.name || user.email).charAt(0).toUpperCase()}
-              </div>
-            )}
-          </div>
-          <div className="user-details">
-            <h2>{user.name || 'User'}</h2>
-            <p>{user.email}</p>
-            <span className="user-badge">Regular User</span>
-          </div>
-        </div>
+        
 
         {/* Quick Actions */}
         <div className="quick-actions">
@@ -73,17 +55,8 @@ const UserDashboard = () => {
               <p>Explore 900+ apple varieties with detailed information</p>
             </Link>
 
-            <Link to="/createapple" className="action-card">
-              <div className="action-icon">➕</div>
-              <h3>Add Apple</h3>
-              <p>Contribute a new apple variety to our database</p>
-            </Link>
-
-            <Link to="/templates" className="action-card">
-              <div className="action-icon">📋</div>
-              <h3>Templates</h3>
-              <p>Create and manage apple templates</p>
-            </Link>
+            
+            
 
             <Link to="/about" className="action-card">
               <div className="action-icon">🌳</div>
@@ -97,11 +70,6 @@ const UserDashboard = () => {
               <p>View and edit your profile information</p>
             </div>
 
-            <div className="action-card">
-              <div className="action-icon">⭐</div>
-              <h3>Favorites</h3>
-              <p>View your favorite apple varieties</p>
-            </div>
           </div>
         </div>
 
@@ -135,32 +103,7 @@ const UserDashboard = () => {
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="dashboard-stats">
-          <div className="stat-card">
-            <div className="stat-icon">🍎</div>
-            <div className="stat-content">
-              <h3>0</h3>
-              <p>Apples Added</p>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon">⭐</div>
-            <div className="stat-content">
-              <h3>0</h3>
-              <p>Favorites</p>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon">👁️</div>
-            <div className="stat-content">
-              <h3>0</h3>
-              <p>Views</p>
-            </div>
-          </div>
-        </div>
+        
       </div>
     </div>
   );

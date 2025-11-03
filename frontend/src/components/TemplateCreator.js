@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import './TemplateCreator.css';
 
 const TemplateCreator = () => {
+  const navigate = useNavigate();
   const [selectedFields, setSelectedFields] = useState(new Set());
   const [activeCategory, setActiveCategory] = useState('identity');
   
@@ -54,6 +57,11 @@ const TemplateCreator = () => {
   useEffect(() => {
     setSelectedFields(new Set(defaultFields));
   }, []);
+
+  // Back to Create Apple handler
+  const handleBackToCreateApple = () => {
+    navigate('/create-apple');
+  };
 
   // Scroll to category when clicked
   const scrollToCategory = (categoryKey) => {
@@ -110,6 +118,15 @@ const TemplateCreator = () => {
 
   return (
     <div className="template-creator">
+      {/* Back Button */}
+      <button 
+        className="back-to-create-btn"
+        onClick={handleBackToCreateApple}
+      >
+        <ArrowLeft size={20} />
+        Back to Create Apple
+      </button>
+
       <div className="template-header">
         <h1>Template Creator</h1>
         <div className="subtitle-list">

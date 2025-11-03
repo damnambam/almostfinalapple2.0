@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, X, Clock, Activity, Check, XCircle, Eye, Plus, FileText, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, X, Clock, Activity, Check, XCircle, Eye, Plus, FileText } from 'lucide-react';
 import AppleDisp from './AppleDisp';
 import './AdminDashboard.css';
 import {
@@ -12,13 +13,13 @@ import {
 } from '../services/adminService';
 
 const AdminDashboard = ({ isAdmin, onNavigateToTemplates }) => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAdmin, setSelectedAdmin] = useState(null);
   const [showActivityLog, setShowActivityLog] = useState(false);
   const [selectedApple, setSelectedApple] = useState(null);
   const [showAppleDisp, setShowAppleDisp] = useState(false);
-  const [isCreatingNewApple, setIsCreatingNewApple] = useState(false);
   
   // State for data from backend
   const [pendingAdmins, setPendingAdmins] = useState([]);
@@ -26,7 +27,7 @@ const AdminDashboard = ({ isAdmin, onNavigateToTemplates }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activityLog, setActivityLog] = useState([]);
-  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
 
   // Fetch data on component mount
   useEffect(() => {
@@ -34,13 +35,29 @@ const AdminDashboard = ({ isAdmin, onNavigateToTemplates }) => {
     fetchAllData();
   }, []);
 
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    console.log('⏰ Setting up auto-refresh (30 seconds)...');
+    const intervalId = setInterval(() => {
+      console.log('🔄 Auto-refreshing dashboard data...');
+      fetchAllData(true); // true = silent refresh (no loading spinner)
+    }, 30000); // 30 seconds
+
+    // Cleanup on unmount
+    return () => {
+      console.log('🛑 Clearing auto-refresh interval');
+      clearInterval(intervalId);
+    };
+  }, []);
+
   // Fetch all data
-  const fetchAllData = async () => {
-    setLoading(true);
+  const fetchAllData = async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+    }
     setError('');
-    setRefreshing(true);
     
-    console.log('🔄 Starting fetchAllData...');
+    console.log('🔄 Starting fetchAllData...', silent ? '(silent)' : '(with loading)');
     
     try {
       // Check if token exists
@@ -56,7 +73,8 @@ const AdminDashboard = ({ isAdmin, onNavigateToTemplates }) => {
         fetchCurrentAdmins()
       ]);
       
-      console.log('✅ All data fetched successfully');
+      setLastRefresh(new Date());
+      console.log('✅ All data fetched successfully at', new Date().toLocaleTimeString());
     } catch (err) {
       const errorMessage = err.message || 'Failed to load data. Please try again.';
       setError(errorMessage);
@@ -67,8 +85,9 @@ const AdminDashboard = ({ isAdmin, onNavigateToTemplates }) => {
         setError('Session expired. Please logout and login again.');
       }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -120,7 +139,7 @@ const AdminDashboard = ({ isAdmin, onNavigateToTemplates }) => {
       console.log('⏳ Approving request:', requestId);
       await approveAdminRequest(requestId);
       alert('Admin request approved successfully! ✅');
-      await fetchAllData(); // Refresh data
+      await fetchAllData(); // Refresh data immediately
     } catch (err) {
       const errorMsg = err.message || 'Failed to approve request';
       alert('❌ Error: ' + errorMsg);
@@ -138,7 +157,7 @@ const AdminDashboard = ({ isAdmin, onNavigateToTemplates }) => {
       console.log('⏳ Rejecting request:', requestId);
       await rejectAdminRequest(requestId);
       alert('Admin request rejected ✅');
-      await fetchPendingRequests(); // Refresh pending requests
+      await fetchAllData(); // Refresh data immediately
     } catch (err) {
       const errorMsg = err.message || 'Failed to reject request';
       alert('❌ Error: ' + errorMsg);
@@ -163,6 +182,9 @@ const AdminDashboard = ({ isAdmin, onNavigateToTemplates }) => {
       ));
       
       alert(`Admin status updated successfully! ✅`);
+      
+      // Refresh to ensure sync with backend
+      setTimeout(() => fetchAllData(true), 500);
     } catch (err) {
       const errorMsg = err.message || 'Failed to update admin status';
       alert('❌ Error: ' + errorMsg);
@@ -176,7 +198,6 @@ const AdminDashboard = ({ isAdmin, onNavigateToTemplates }) => {
       console.log('📋 Opening activity log for:', admin.name);
       setSelectedAdmin(admin);
       setShowActivityLog(true);
-      setLoading(true);
       
       // Fetch activity log from backend
       const data = await getAdminActivityLog(admin._id);
@@ -186,52 +207,19 @@ const AdminDashboard = ({ isAdmin, onNavigateToTemplates }) => {
       console.error('❌ Error fetching activity log:', err);
       setActivityLog([]);
       alert('Could not load activity log: ' + (err.message || 'Unknown error'));
-    } finally {
-      setLoading(false);
     }
   };
 
-  // Handle create new apple
+  // Handle create new apple - Navigate to CreateApple page
   const handleCreateNewApple = () => {
-    const newApple = {
-      id: Date.now(),
-      name: '',
-      origin: '',
-      status: 'Active',
-      lastUpdated: new Date().toISOString().split('T')[0],
-      acno: '',
-      accession: '',
-      cultivar_name: '',
-      e_origin_country: '',
-      e_origin_province: '',
-      e_origin_city: '',
-      e_genus: 'Malus',
-      e_species: 'domestica',
-      e_pedigree: '',
-      e_breeder: '',
-      e_collector: '',
-      description: '',
-      taste: '',
-      texture: '',
-      uses: '',
-      harvestSeason: '',
-      hardiness: '',
-      storage: ''
-    };
-    setSelectedApple(newApple);
-    setIsCreatingNewApple(true);
-    setShowAppleDisp(true);
+    console.log('🍎 Navigating to Create Apple page...');
+    navigate('/create-apple');
   };
 
-  // Handle save apple changes
+  // Handle save apple changes (if you still need AppleDisp modal for viewing)
   const handleSaveApple = (updatedApple) => {
-    if (isCreatingNewApple) {
-      alert('New apple variety created successfully! 🍎');
-    } else {
-      alert('Apple variety updated successfully! ✅');
-    }
+    alert('Apple variety updated successfully! ✅');
     setShowAppleDisp(false);
-    setIsCreatingNewApple(false);
   };
 
   // Format date helper
@@ -304,19 +292,11 @@ const AdminDashboard = ({ isAdmin, onNavigateToTemplates }) => {
           {(pendingAdmins.length > 0 || currentAdmins.length > 0) && (
             <p className="data-summary">
               {pendingAdmins.length} pending • {currentAdmins.length} current admins
+              <span className="last-refresh"> • Last updated: {lastRefresh.toLocaleTimeString()}</span>
             </p>
           )}
         </div>
         <div className="admin-header-actions">
-          <button 
-            className="refresh-btn"
-            onClick={fetchAllData}
-            disabled={refreshing}
-            title="Refresh data"
-          >
-            <RefreshCw size={20} className={refreshing ? 'spinning' : ''} />
-            Refresh
-          </button>
           {onNavigateToTemplates && (
             <button 
               className="create-btn template-btn"
@@ -339,7 +319,7 @@ const AdminDashboard = ({ isAdmin, onNavigateToTemplates }) => {
       {error && (
         <div className="error-banner">
           <p>⚠️ {error}</p>
-          <button onClick={fetchAllData}>🔄 Retry</button>
+          <button onClick={() => fetchAllData()}>🔄 Retry</button>
         </div>
       )}
 
@@ -547,18 +527,14 @@ const AdminDashboard = ({ isAdmin, onNavigateToTemplates }) => {
         </div>
       )}
 
-      {/* Apple Display Modal */}
+      {/* Apple Display Modal (for viewing/editing existing apples) */}
       {showAppleDisp && selectedApple && (
         <AppleDisp 
           appleData={selectedApple}
-          onClose={() => {
-            setShowAppleDisp(false);
-            setIsCreatingNewApple(false);
-          }}
+          onClose={() => setShowAppleDisp(false)}
           isEditing={true}
           isAdmin={isAdmin}
           onSave={handleSaveApple}
-          isNewApple={isCreatingNewApple}
         />
       )}
     </div>

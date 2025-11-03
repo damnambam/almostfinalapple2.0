@@ -142,9 +142,7 @@ const Navigation = () => {
         <div className="nav-actions">
           {isLoggedIn ? (
             <div className="user-menu">
-              <span className="user-greeting">
-                Hi, {user?.name || user?.email}
-              </span>
+              
               <button
                 className="logout-btn"
                 onClick={handleLogout}
