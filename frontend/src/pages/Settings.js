@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, Lock, Eye, Accessibility, Save, Moon, Sun, Type, Contrast } from 'lucide-react';
+import { updateUserProfile, changePassword } from '../services/authService';
 import './Settings.css';
 
 const Settings = () => {
@@ -142,35 +143,46 @@ const Settings = () => {
     setMessage({ type: '', text: '' });
 
     try {
-      // Validate fields
-      if (!userDetails.name || !userDetails.email) {
-        setMessage({ type: 'error', text: 'Name and email are required.' });
+      // Build update object with only non-empty fields
+      const updateData = {};
+      
+      if (userDetails.name && userDetails.name.trim()) {
+        updateData.name = userDetails.name.trim();
+      }
+      
+      if (userDetails.email && userDetails.email.trim()) {
+        updateData.email = userDetails.email.trim();
+      }
+      
+      if (userDetails.dob) {
+        updateData.dob = userDetails.dob;
+      }
+
+      // Check if there's anything to update
+      if (Object.keys(updateData).length === 0) {
+        setMessage({ type: 'error', text: 'No changes to save.' });
         setLoading(false);
         return;
       }
 
-      // TODO: Add API call to update user details
-      // For now, update localStorage
-      const isAdmin = localStorage.getItem('isAdmin') === 'true';
-      const storageKey = isAdmin ? 'adminData' : 'userData';
-      const currentData = JSON.parse(localStorage.getItem(storageKey) || '{}');
-      
-      const updatedData = {
-        ...currentData,
-        name: userDetails.name,
-        email: userDetails.email,
-        dob: userDetails.dob
-      };
-      
-      localStorage.setItem(storageKey, JSON.stringify(updatedData));
-      
-      setMessage({ type: 'success', text: 'Profile updated successfully!' });
-      
-      // Dispatch event to update navigation
-      window.dispatchEvent(new Event('authChange'));
+      // Call backend API
+      const response = await updateUserProfile(updateData);
+
+      if (response.success) {
+        setMessage({ type: 'success', text: 'Profile updated successfully!' });
+        
+        // Update local state with new data
+        if (response.user) {
+          setUserDetails({
+            name: response.user.name || '',
+            email: response.user.email || '',
+            dob: response.user.dob || ''
+          });
+        }
+      }
     } catch (err) {
       console.error('Error saving details:', err);
-      setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' });
+      setMessage({ type: 'error', text: err.message || 'Failed to update profile. Please try again.' });
     } finally {
       setLoading(false);
     }
@@ -201,28 +213,23 @@ const Settings = () => {
         return;
       }
 
-      // TODO: Add API call to change password
-      // const response = await fetch('http://localhost:5000/api/auth/change-password', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     'Authorization': `Bearer ${localStorage.getItem('token')}`
-      //   },
-      //   body: JSON.stringify({
-      //     currentPassword: passwordData.currentPassword,
-      //     newPassword: passwordData.newPassword
-      //   })
-      // });
+      // Call backend API
+      const response = await changePassword(
+        passwordData.currentPassword,
+        passwordData.newPassword
+      );
 
-      setMessage({ type: 'success', text: 'Password changed successfully!' });
-      setPasswordData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      });
+      if (response.success) {
+        setMessage({ type: 'success', text: 'Password changed successfully!' });
+        setPasswordData({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        });
+      }
     } catch (err) {
       console.error('Error changing password:', err);
-      setMessage({ type: 'error', text: 'Failed to change password. Please try again.' });
+      setMessage({ type: 'error', text: err.message || 'Failed to change password. Please try again.' });
     } finally {
       setLoading(false);
     }
@@ -277,10 +284,10 @@ const Settings = () => {
           {activeTab === 'profile' && (
             <div className="tab-panel">
               <h2>Profile Information</h2>
-              <p className="tab-description">Update your personal information</p>
+              <p className="tab-description">Update your personal information (all fields are optional)</p>
 
               <div className="form-group">
-                <label htmlFor="name">Name</label>
+                <label htmlFor="name">Name (optional)</label>
                 <input
                   type="text"
                   id="name"
@@ -292,7 +299,7 @@ const Settings = () => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="email">Email</label>
+                <label htmlFor="email">Email (optional)</label>
                 <input
                   type="email"
                   id="email"
@@ -304,7 +311,7 @@ const Settings = () => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="dob">Date of Birth</label>
+                <label htmlFor="dob">Date of Birth (optional)</label>
                 <input
                   type="date"
                   id="dob"

@@ -1,29 +1,66 @@
-// settingsRoutes.js - Add this to your backend routes folder
+// settingsRoutes.js - ES6 Module Version
+import express from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
-const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 
-// Assuming you have User and Admin models
-// const User = require('../models/User');
-// const Admin = require('../models/Admin');
+// Import models - adjust paths as needed
+let User, Admin;
+try {
+  const userModel = await import('../models/User.js');
+  User = userModel.User || userModel.default;
+  
+  const adminModel = await import('../models/Admin.js');
+  Admin = adminModel.Admin || adminModel.default;
+} catch (err) {
+  console.error('❌ Failed to import models in settingsRoutes:', err.message);
+}
 
-// Middleware to verify token
+// Middleware to verify token (works with simple tokens from your auth system)
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ error: 'Access denied. No token provided.' });
+    return res.status(401).json({ 
+      success: false,
+      error: 'Access denied. No token provided.' 
+    });
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    req.user = decoded;
+    // Parse simple token format: "user-{userId}-{timestamp}" or "admin-{adminId}-{timestamp}"
+    let userId, isAdmin = false;
+    
+    if (token.startsWith('user-')) {
+      const parts = token.split('-');
+      userId = parts[1];
+      isAdmin = false;
+    } else if (token.startsWith('admin-')) {
+      const parts = token.split('-');
+      userId = parts[1];
+      isAdmin = true;
+    } else {
+      return res.status(403).json({ 
+        success: false,
+        error: 'Invalid token format.' 
+      });
+    }
+
+    // Attach user info to request
+    req.user = {
+      id: userId,
+      isAdmin: isAdmin
+    };
+    
     next();
   } catch (error) {
-    res.status(403).json({ error: 'Invalid or expired token.' });
+    console.error('Token authentication error:', error);
+    res.status(403).json({ 
+      success: false,
+      error: 'Invalid or expired token.' 
+    });
   }
 };
 
@@ -36,37 +73,62 @@ router.put('/profile', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     const isAdmin = req.user.isAdmin;
 
-    // Validate inputs
-    if (!name || !email) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Name and email are required.' 
-      });
+    // Build update object with only provided fields
+    const updateData = {};
+    
+    if (name !== undefined && name !== null) {
+      if (name.trim() === '') {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Name cannot be empty.' 
+        });
+      }
+      updateData.name = name;
+    }
+    
+    if (email !== undefined && email !== null) {
+      if (email.trim() === '') {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Email cannot be empty.' 
+        });
+      }
+      
+      // Email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Invalid email format.' 
+        });
+      }
+      updateData.email = email;
+    }
+    
+    if (dob !== undefined && dob !== null) {
+      updateData.dob = dob;
     }
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    // Check if there's anything to update
+    if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Invalid email format.' 
+        message: 'No fields to update.' 
       });
     }
 
     // Find and update user in appropriate collection
     let updatedUser;
     if (isAdmin) {
-      // Update in Admin collection
       updatedUser = await Admin.findByIdAndUpdate(
         userId,
-        { name, email, dob },
+        updateData,
         { new: true, runValidators: true }
       ).select('-password');
     } else {
-      // Update in User collection
       updatedUser = await User.findByIdAndUpdate(
         userId,
-        { name, email, dob },
+        updateData,
         { new: true, runValidators: true }
       ).select('-password');
     }
@@ -207,4 +269,5 @@ router.get('/profile', authenticateToken, async (req, res) => {
   }
 });
 
-module.exports = router;
+// Export as ES6 default export
+export default router;

@@ -11,9 +11,11 @@ import { dirname } from "path";
 // Import routes and handlers
 import authRoutes from "./routes/authRoutes.js";
 import adminManagementRoutes from "./routes/adminRoutes.js";
-import appleRoutes from "./routes/appleRoutes.js"; // ✅ NEW: Add this line
+import appleRoutes from "./routes/appleRoutes.js"; //
+import settingsRoutes from "./routes/settingsRoutes.js";
 import { handleSignupRequest } from "./signupHandler.js";
 import { Admin } from "./models/Admin.js";
+
 
 dotenv.config();
 
@@ -161,6 +163,16 @@ app.use("/api/apples", appleRoutes);
 app.use("/images", express.static(path.join(__dirname, "images")));
 
 // ========================
+// SETTINGS ROUTES
+// ========================
+app.use("/api/auth/settings", settingsRoutes);
+
+// ========================
+// STATIC FILES
+// ========================
+app.use("/images", express.static(path.join(__dirname, "images")));
+
+// ========================
 // 404 HANDLER
 // ========================
 app.use((req, res) => {
@@ -203,8 +215,3 @@ process.on('unhandledRejection', (err) => {
   process.exit(1);
 });
 
-// ========================
-// SETTINGS ROUTES
-// ========================
-const settingsRoutes = require('./routes/settingsRoutes');
-app.use('/api/auth/settings', settingsRoutes);

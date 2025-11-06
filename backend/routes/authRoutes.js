@@ -1,304 +1,371 @@
-const API_URL = "http://localhost:5000/api/auth";
-const ADMIN_API_URL = "http://localhost:5000/api/admin";
+// routes/authRoutes.js
+// Authentication routes for regular users (not admins)
+
+import express from 'express';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+
+const router = express.Router();
+
+// Import User model - adjust path based on your structure
+let User;
+try {
+  const userModel = await import('../models/User.js');
+  User = userModel.User || userModel.default;
+} catch (err) {
+  console.error('❌ Failed to import User model:', err.message);
+}
 
 // ========================
-// SIGNUP
+// SIGNUP (Register new user)
 // ========================
-export const signup = async (email, password, name) => {
+router.post('/signup', async (req, res) => {
   try {
-    const response = await fetch(`${API_URL}/signup`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password, name }),
-    });
+    const { email, password, name } = req.body;
 
-    const data = await response.json();
+    console.log('📝 User signup attempt:', email);
 
-    if (!response.ok) {
-      throw new Error(data.message || "Signup failed");
+    // Validate inputs
+    if (!email || !password || !name) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'All fields are required: email, password, and name.' 
+      });
     }
 
-    return data;
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid email format.' 
+      });
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Password must be at least 6 characters long.' 
+      });
+    }
+
+    if (!User) {
+      return res.status(500).json({ 
+        success: false,
+        message: 'User model not configured.' 
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Email already registered.' 
+      });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create new user
+    const newUser = new User({
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      password: hashedPassword,
+      createdAt: new Date()
+    });
+
+    await newUser.save();
+
+    // Generate token (simple version - you can use JWT)
+    const token = `user-${newUser._id}-${Date.now()}`;
+
+    console.log('✅ User created successfully:', email);
+
+    res.status(201).json({
+      success: true,
+      message: 'Signup successful!',
+      token: token,
+      user: {
+        id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
+        createdAt: newUser.createdAt
+      }
+    });
   } catch (error) {
-    throw error;
+    console.error('❌ Signup error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Signup failed. Please try again.',
+      error: error.message
+    });
   }
-};
+});
 
 // ========================
 // LOGIN
 // ========================
-export const login = async (email, password) => {
+router.post('/login', async (req, res) => {
   try {
-    const response = await fetch(`${API_URL}/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
-    });
+    const { email, password } = req.body;
 
-    const data = await response.json();
+    console.log('🔐 User login attempt:', email);
 
-    if (!response.ok) {
-      throw new Error(data.message || "Login failed");
+    // Validate inputs
+    if (!email || !password) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Email and password are required.' 
+      });
     }
 
-    // Store user data and token in localStorage
-    if (data.success && data.user) {
-      localStorage.setItem("user", JSON.stringify(data.user));
-      localStorage.setItem("userData", JSON.stringify(data.user));
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("isAdmin", "false");
-      
-      // Dispatch custom event to update Navigation
-      window.dispatchEvent(new Event('authChange'));
+    if (!User) {
+      return res.status(500).json({ 
+        success: false,
+        message: 'User model not configured.' 
+      });
     }
 
-    return data;
-  } catch (error) {
-    throw error;
-  }
-};
-
-// ========================
-// ADMIN LOGIN
-// ========================
-export const adminLogin = async (email, password) => {
-  try {
-    const response = await fetch(`${ADMIN_API_URL}/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || "Admin login failed");
+    // Find user
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      console.log('❌ User not found:', email);
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid email or password.' 
+      });
     }
 
-    // Store admin data and token
-    if (data.token) {
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("adminToken", data.token);
-      localStorage.setItem("isAdmin", "true");
-      
-      if (data.admin) {
-        localStorage.setItem("user", JSON.stringify(data.admin));
-        localStorage.setItem("admin", JSON.stringify(data.admin));
-        localStorage.setItem("adminData", JSON.stringify(data.admin));
-        localStorage.setItem("userData", JSON.stringify(data.admin));
+    // Check if account is active (if your model has this field)
+    if (user.isActive === false) {
+      console.log('❌ User account is inactive:', email);
+      return res.status(401).json({ 
+        success: false,
+        message: 'Account is inactive. Please contact support.' 
+      });
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      console.log('❌ Invalid password for user:', email);
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid email or password.' 
+      });
+    }
+
+    // Update last login (if your model has this field)
+    if (user.lastLogin !== undefined) {
+      user.lastLogin = new Date();
+      await user.save();
+    }
+
+    // Generate token (simple version - you can use JWT)
+    const token = `user-${user._id}-${Date.now()}`;
+
+    console.log('✅ User login successful:', email);
+
+    res.json({
+      success: true,
+      message: 'Login successful!',
+      token: token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        dob: user.dob,
+        createdAt: user.createdAt
       }
-      
-      console.log('✅ Admin token stored:', data.token);
-      
-      // Dispatch custom event to update Navigation
-      window.dispatchEvent(new Event('authChange'));
-    }
-
-    return data;
-  } catch (error) {
-    throw error;
-  }
-};
-
-// ========================
-// LOGOUT
-// ========================
-export const logout = () => {
-  localStorage.removeItem("user");
-  localStorage.removeItem("token");
-  localStorage.removeItem("adminToken");
-  localStorage.removeItem("isAdmin");
-  localStorage.removeItem("admin");
-  localStorage.removeItem("adminData");
-  localStorage.removeItem("userData");
-  
-  // Dispatch custom event to update Navigation
-  window.dispatchEvent(new Event('authChange'));
-};
-
-// ========================
-// GET CURRENT USER
-// ========================
-export const getCurrentUser = () => {
-  const adminData = localStorage.getItem("adminData");
-  const userData = localStorage.getItem("userData");
-  const user = localStorage.getItem("user");
-  const admin = localStorage.getItem("admin");
-  
-  // Priority: adminData > userData > admin > user
-  if (adminData) {
-    return JSON.parse(adminData);
-  }
-  if (userData) {
-    return JSON.parse(userData);
-  }
-  if (admin) {
-    return JSON.parse(admin);
-  }
-  return user ? JSON.parse(user) : null;
-};
-
-// ========================
-// CHECK IF LOGGED IN
-// ========================
-export const isAuthenticated = () => {
-  const token = localStorage.getItem("token") || localStorage.getItem("adminToken");
-  
-  // Check if token exists and is not null/undefined string
-  if (!token || token === 'null' || token === 'undefined' || token.trim() === '') {
-    return false;
-  }
-  
-  return true;
-};
-
-// ========================
-// CHECK IF ADMIN
-// ========================
-export const isAdmin = () => {
-  return localStorage.getItem("isAdmin") === "true";
-};
-
-// ========================
-// GET USER PROFILE (from backend)
-// ========================
-export const getProfile = async () => {
-  try {
-    const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
-    
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
-
-    const response = await fetch(`${API_URL}/settings/profile`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
     });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || "Failed to fetch profile");
-    }
-
-    return data;
   } catch (error) {
-    throw error;
-  }
-};
-
-// ========================
-// UPDATE USER PROFILE
-// ========================
-export const updateUserProfile = async (profileData) => {
-  try {
-    const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
-    
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
-
-    const response = await fetch(`${API_URL}/settings/profile`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify(profileData),
+    console.error('❌ Login error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Login failed. Please try again.',
+      error: error.message
     });
+  }
+});
 
-    const data = await response.json();
+// ========================
+// LOGOUT (Optional - mainly clears token on frontend)
+// ========================
+router.post('/logout', (req, res) => {
+  console.log('👋 User logout');
+  res.json({
+    success: true,
+    message: 'Logged out successfully!'
+  });
+});
 
-    if (!response.ok) {
-      throw new Error(data.message || "Failed to update profile");
+// ========================
+// VERIFY TOKEN (Check if token is valid)
+// ========================
+router.get('/verify', async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'No token provided.' 
+      });
     }
 
-    // Update stored user data
-    if (data.success && data.user) {
-      const isAdmin = localStorage.getItem('isAdmin') === 'true';
-      
-      if (isAdmin) {
-        localStorage.setItem("admin", JSON.stringify(data.user));
-        localStorage.setItem("adminData", JSON.stringify(data.user));
+    // Extract user ID from token
+    let userId;
+    if (token.startsWith('user-')) {
+      const parts = token.split('-');
+      userId = parts[1];
+    } else {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid token format.' 
+      });
+    }
+
+    if (!User) {
+      return res.status(500).json({ 
+        success: false,
+        message: 'User model not configured.' 
+      });
+    }
+
+    // Find user
+    const user = await User.findById(userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found.' 
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        dob: user.dob,
+        createdAt: user.createdAt
       }
-      
-      localStorage.setItem("user", JSON.stringify(data.user));
-      localStorage.setItem("userData", JSON.stringify(data.user));
-      
-      // Dispatch custom event to update Navigation
-      window.dispatchEvent(new Event('authChange'));
-    }
-
-    return data;
-  } catch (error) {
-    throw error;
-  }
-};
-
-// ========================
-// CHANGE PASSWORD
-// ========================
-export const changePassword = async (currentPassword, newPassword) => {
-  try {
-    const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
-    
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
-
-    const response = await fetch(`${API_URL}/settings/change-password`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify({ 
-        currentPassword, 
-        newPassword 
-      }),
     });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || "Failed to change password");
-    }
-
-    return data;
   } catch (error) {
-    throw error;
-  }
-};
-
-// ========================
-// GET USER PROFILE (OLD - for compatibility)
-// ========================
-export const getUserProfile = async (userId) => {
-  try {
-    const response = await fetch(`${API_URL}/profile/${userId}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
+    console.error('❌ Token verification error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Token verification failed.',
+      error: error.message
     });
+  }
+});
 
-    const data = await response.json();
+// ========================
+// GET USER PROFILE BY ID (for compatibility)
+// ========================
+router.get('/profile/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
 
-    if (!response.ok) {
-      throw new Error(data.message || "Failed to fetch profile");
+    if (!User) {
+      return res.status(500).json({ 
+        success: false,
+        message: 'User model not configured.' 
+      });
     }
 
-    return data;
+    const user = await User.findById(userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found.' 
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        dob: user.dob,
+        createdAt: user.createdAt
+      }
+    });
   } catch (error) {
-    throw error;
+    console.error('❌ Get profile error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch profile.',
+      error: error.message
+    });
   }
-};
+});
+
+// ========================
+// FORGOT PASSWORD (Optional - send reset email)
+// ========================
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Email is required.' 
+      });
+    }
+
+    if (!User) {
+      return res.status(500).json({ 
+        success: false,
+        message: 'User model not configured.' 
+      });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      // Don't reveal if email exists for security
+      return res.json({
+        success: true,
+        message: 'If an account exists with this email, a password reset link has been sent.'
+      });
+    }
+
+    // TODO: Generate reset token and send email
+    // For now, just log it
+    console.log('🔑 Password reset requested for:', email);
+
+    res.json({
+      success: true,
+      message: 'If an account exists with this email, a password reset link has been sent.'
+    });
+  } catch (error) {
+    console.error('❌ Forgot password error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to process request.',
+      error: error.message
+    });
+  }
+});
+
+// ========================
+// TEST ROUTE (Optional - for debugging)
+// ========================
+router.get('/test', (req, res) => {
+  res.json({ 
+    success: true,
+    message: 'Auth routes are working!',
+    timestamp: new Date()
+  });
+});
+
+// Export router as default (ES6)
+export default router;

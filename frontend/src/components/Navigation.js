@@ -19,13 +19,6 @@ const Navigation = () => {
     const adminStatus = localStorage.getItem('isAdmin') === 'true';
     const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
     
-    console.log('🔍 Auth State Check:', {
-      loggedIn,
-      isAdmin: adminStatus,
-      hasToken: !!token,
-      user: currentUser
-    });
-    
     // If getCurrentUser didn't return user data, try getting from localStorage directly
     if (!currentUser || !currentUser.name) {
       try {
@@ -86,7 +79,6 @@ const Navigation = () => {
     else if (path === '/about') setActiveTab('about');
     else if (path === '/dashboard') setActiveTab('dashboard');
     else if (path === '/user-dashboard') setActiveTab('dashboard');
-    else if (path === '/settings') setActiveTab('settings');
   }, [location.pathname]);
 
   // Build tabs array dynamically
@@ -120,11 +112,6 @@ const Navigation = () => {
     navigate('/signup-login');
   };
 
-  const handleSettingsClick = () => {
-    console.log('⚙️ Settings button clicked');
-    navigate('/settings');
-  };
-
   const handleLogout = () => {
     logout();
     setUser(null);
@@ -137,8 +124,6 @@ const Navigation = () => {
     
     navigate('/');
   };
-
-  console.log('🎨 Rendering Navigation - isLoggedIn:', isLoggedIn, 'isAdmin:', isAdminUser);
 
   return (
     <nav className="navigation">
@@ -170,17 +155,13 @@ const Navigation = () => {
         <div className="nav-actions">
           {isLoggedIn ? (
             <div className="user-menu">
-              {/* Settings Button */}
               <button
                 className="settings-btn"
-                onClick={handleSettingsClick}
+                onClick={() => navigate('/settings')}
                 title="Settings"
               >
                 <Settings size={18} />
-                <span>Settings</span>
               </button>
-
-              {/* Logout Button */}
               <button
                 className="logout-btn"
                 onClick={handleLogout}
