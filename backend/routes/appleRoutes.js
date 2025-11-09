@@ -195,7 +195,7 @@ router.post('/single-upload', verifyAdminToken, upload.array('images', 10), asyn
 // ========================
 // BULK UPLOAD WITH IMAGES
 // ========================
-router.post('/bulk-upload-with-images', verifyAdminToken, upload.array('images', 500), async (req, res) => {
+router.post('/bulk-upload-with-images', verifyAdminToken, upload.any(), async (req, res) => {
   try {
     console.log('📥 Bulk upload request received');
     console.log('📸 Total files received:', req.files?.length || 0);
@@ -217,13 +217,15 @@ router.post('/bulk-upload-with-images', verifyAdminToken, upload.array('images',
       });
     }
 
-    // Parse apple data from body
-    Object.keys(req.body).forEach(key => {
-      if (key.startsWith('apples[')) {
-        const appleData = JSON.parse(req.body[key]);
-        const index = parseInt(key.match(/\[(\d+)\]/)[1]); // Extract index as number
-        
-        // Get corresponding image using numeric index
+    // Parse apple data from body - handle both formats
+    console.log('🔍 DEBUG: req.body structure:', JSON.stringify(Object.keys(req.body)));
+    console.log('🔍 DEBUG: req.body.apples type:', typeof req.body.apples);
+    
+    // Check if apples is already an array (parsed by body parser)
+    if (req.body.apples && Array.isArray(req.body.apples)) {
+      console.log('📦 Apples received as array, length:', req.body.apples.length);
+      req.body.apples.forEach((appleDataStr, index) => {
+        const appleData = typeof appleDataStr === 'string' ? JSON.parse(appleDataStr) : appleDataStr;
         const imageInfo = imageMap[index];
         
         apples.push({
@@ -232,8 +234,45 @@ router.post('/bulk-upload-with-images', verifyAdminToken, upload.array('images',
         });
 
         console.log(`🍎 Apple ${index}:`, appleData.cultivar_name || appleData.name, '→ Image:', imageInfo?.originalName || 'No image');
+      });
+    } 
+    // Check if it's a stringified array
+    else if (req.body.apples && typeof req.body.apples === 'string') {
+      console.log('📦 Apples received as string, parsing...');
+      const parsedApples = JSON.parse(req.body.apples);
+      if (Array.isArray(parsedApples)) {
+        parsedApples.forEach((appleData, index) => {
+          const imageInfo = imageMap[index];
+          
+          apples.push({
+            data: appleData,
+            image: imageInfo ? imageInfo.path : null
+          });
+
+          console.log(`🍎 Apple ${index}:`, appleData.cultivar_name || appleData.name, '→ Image:', imageInfo?.originalName || 'No image');
+        });
       }
-    });
+    }
+    // Handle indexed keys format: apples[0], apples[1], etc.
+    else {
+      console.log('📦 Looking for indexed apples[n] keys');
+      Object.keys(req.body).forEach(key => {
+        if (key.startsWith('apples[')) {
+          const appleData = JSON.parse(req.body[key]);
+          const index = parseInt(key.match(/\[(\d+)\]/)[1]); // Extract index as number
+          
+          // Get corresponding image using numeric index
+          const imageInfo = imageMap[index];
+          
+          apples.push({
+            data: appleData,
+            image: imageInfo ? imageInfo.path : null
+          });
+
+          console.log(`🍎 Apple ${index}:`, appleData.cultivar_name || appleData.name, '→ Image:', imageInfo?.originalName || 'No image');
+        }
+      });
+    }
 
     console.log('📊 Parsed apples:', apples.length);
 

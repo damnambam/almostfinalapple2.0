@@ -296,71 +296,99 @@ export default function CreateApple() {
   };
 
   // STEP 3: Save to Database
-  const handleSaveToDatabase = async () => {
-    setLoading(true);
+const handleSaveToDatabase = async () => {
+  setLoading(true);
+  
+  try {
+    // Combine matched data with manual matches
+    const finalData = [...matchedData];
     
-    try {
-      // Combine matched data with manual matches
-      const finalData = [...matchedData];
-      
-      unmatchedApples.forEach((item, index) => {
-        if (manualMatches[index]) {
-          const selectedImage = extractedImages.find(img => img.name === manualMatches[index]);
-          if (selectedImage) {
-            finalData.push({
-              apple: item.apple,
-              image: selectedImage,
-              cultivarName: item.cultivarName,
-              accessionNumber: item.accessionNumber
-            });
-          }
+    unmatchedApples.forEach((item, index) => {
+      if (manualMatches[index]) {
+        const selectedImage = extractedImages.find(img => img.name === manualMatches[index]);
+        if (selectedImage) {
+          finalData.push({
+            apple: item.apple,
+            image: selectedImage,
+            cultivarName: item.cultivarName,
+            accessionNumber: item.accessionNumber
+          });
         }
-      });
-
-      console.log('💾 Saving to database:', finalData.length, 'entries');
-
-      // Create FormData for upload
-      const formData = new FormData();
-      
-      finalData.forEach((item, index) => {
-        // Add apple data with index notation
-        formData.append(`apples[${index}]`, JSON.stringify(item.apple));
-        
-        // Add image blob (all use same field name 'images')
-        if (item.image && item.image.blob) {
-          formData.append('images', item.image.blob, item.image.name);
-        }
-      });
-
-      // Debug: Check FormData contents
-      console.log('📋 FormData contents:');
-      for (let pair of formData.entries()) {
-        console.log(pair[0], ':', pair[1] instanceof Blob ? `Blob: ${pair[1].size} bytes` : pair[1].substring(0, 100) + '...');
       }
+    });
 
-      console.log('📤 Sending to backend:', finalData.length, 'items');
+    console.log('💾 Saving to database:', finalData.length, 'entries');
+    console.log('🔍 DEBUG: finalData structure:', finalData);
+    console.log('🔍 DEBUG: First item:', finalData[0]);
 
-      // Send to backend
-      const response = await axios.post('http://localhost:5000/api/apples/bulk-upload-with-images', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-
-      console.log('✅ Upload response:', response.data);
-      alert(`🎉 Successfully uploaded ${response.data.stats.successful} apple(s) with images!`);
+    // Create FormData for upload
+    const formData = new FormData();
+    
+    finalData.forEach((item, index) => {
+      // Add apple data with index notation
+      formData.append(`apples[${index}]`, JSON.stringify(item.apple));
       
-      // Reset and go back to start
-      handleBackToStart();
-      
-    } catch (err) {
-      console.error('❌ Save error:', err);
-      alert(`❌ Error: ${err.response?.data?.message || err.message || 'Save failed'}`);
-    } finally {
-      setLoading(false);
+      // Add image blob (all use same field name 'images')
+      if (item.image && item.image.blob) {
+        formData.append('images', item.image.blob, item.image.name);
+      }
+    });
+
+    // Debug: Check FormData contents
+    console.log('📋 FormData contents:');
+    for (let pair of formData.entries()) {
+      if (pair[0].startsWith('apples')) {
+        console.log('🍎', pair[0], ':', pair[1].substring(0, 100) + '...');
+      }
+      if (pair[0] === 'images') {
+        console.log('📸', pair[0], ':', pair[1] instanceof Blob ? `Blob: ${pair[1].size} bytes` : pair[1]);
+      }
     }
-  };
 
+    console.log('📤 Sending to backend:', finalData.length, 'items');
+
+     // Get admin token from localStorage
+    const adminToken = localStorage.getItem('adminToken');
+
+    if (!adminToken) {
+      setLoading(false);
+      alert('❌ You must be logged in as admin to upload apples.');
+      navigate('/signup-login');
+      return;
+    }
+
+    console.log('🔐 Using admin token for upload');
+
+    // Send to backend with authentication
+    const response = await axios.post('http://localhost:5000/api/apples/bulk-upload-with-images', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${adminToken}`
+      }
+    });
+
+    console.log('✅ Upload response:', response.data);
+    alert(`🎉 Successfully uploaded ${response.data.stats.successful} apple(s) with images!`);
+    
+    // Reset and go back to start
+    handleBackToStart();
+    
+   } catch (err) {
+    console.error('❌ Save error:', err);
+    console.error('❌ Error response:', err.response?.data);
+    console.error('❌ Status code:', err.response?.status);
+    
+    if (err.response?.status === 401) {
+      alert('❌ Authentication failed. Please log in again as admin.');
+      navigate('/signup-login');
+    } else {
+      alert(`❌ Error: ${err.response?.data?.message || err.message || 'Save failed'}`);
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+  
   return (
     <div className="create-apple-container">
       <h1 className="page-title">Create New Apple Resource 🍎</h1>
