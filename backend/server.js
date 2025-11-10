@@ -3,7 +3,6 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import path from "path";
-import bcrypt from "bcrypt";
 import multer from "multer";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
@@ -11,11 +10,10 @@ import { dirname } from "path";
 // Import routes and handlers
 import authRoutes from "./routes/authRoutes.js";
 import adminManagementRoutes from "./routes/adminRoutes.js";
-import appleRoutes from "./routes/appleRoutes.js"; //
+import appleRoutes from "./routes/appleRoutes.js";
 import settingsRoutes from "./routes/settingsRoutes.js";
 import { handleSignupRequest } from "./signupHandler.js";
-import { Admin } from "./models/Admin.js";
-
+import passwordlessAuthRoutes from './routes/passwordlessAuthRoutes.js';
 
 dotenv.config();
 
@@ -49,7 +47,7 @@ mongoose
   })
   .catch((err) => {
     console.error("❌ MongoDB connection error:", err);
-    process.exit(1); // Exit if database connection fails
+    process.exit(1);
   });
 
 // ========================
@@ -76,91 +74,36 @@ app.get("/", (req, res) => {
     endpoints: {
       user_auth: "/api/auth/*",
       admin_auth: "/api/admin/*",
-      apples: "/api/apples/*" // ✅ NEW: Add this line
+      apples: "/api/apples/*"
     }
   });
 });
 
 // ========================
-// USER AUTHENTICATION ROUTES (Regular Users)
+// USER AUTHENTICATION ROUTES
 // ========================
 app.use("/api/auth", authRoutes);
 
 // ========================
-// ADMIN ROUTES (Admin System)
+// PASSWORD RECOVERY AND OTP ROUTES (Users)
 // ========================
+app.use('/api/login', passwordlessAuthRoutes);
 
-// Admin signup request (separate from user signup)
-app.post("/api/admin/signup-request", handleSignupRequest);
-
-// Admin login
-app.post("/api/admin/login", async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    
-    console.log('🔐 Admin login attempt:', email);
-    
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password required" });
-    }
-
-    const admin = await Admin.findOne({ email });
-    if (!admin) {
-      console.log('❌ Admin not found:', email);
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
-
-    if (!admin.isActive) {
-      console.log('❌ Admin account is inactive:', email);
-      return res.status(401).json({ error: "Admin account is inactive" });
-    }
-
-    const match = await bcrypt.compare(password, admin.password);
-    if (!match) {
-      console.log('❌ Password mismatch');
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
-
-    // Update last login
-    admin.lastLogin = new Date();
-    await admin.save();
-
-    // Generate a proper token
-    const token = `admin-${admin._id}-${Date.now()}`;
-    
-    console.log('✅ Admin login successful, token generated:', token);
-
-    res.json({ 
-      token: token, 
-      message: "Admin login successful",
-      admin: {
-        id: admin._id,
-        name: admin.name,
-        email: admin.email,
-        role: admin.role || 'Admin'
-      }
-    });
-  } catch (err) {
-    console.error("❌ Admin login error:", err);
-    res.status(500).json({ error: "Server Error", details: err.message });
-  }
-});
 
 // ========================
-// ADMIN MANAGEMENT ROUTES (Dashboard API)
+// ADMIN MANAGEMENT ROUTES (includes login, OTP, dashboard)
 // ========================
 app.use("/api/admin", adminManagementRoutes);
 
 // ========================
-// APPLE ROUTES (Apple CRUD Operations)
-// ✅ NEW: Add this entire section
+// ADMIN ROUTES
 // ========================
-app.use("/api/apples", appleRoutes);
+app.post("/api/admin/signup-request", handleSignupRequest);
 
 // ========================
-// STATIC FILES
+// APPLE ROUTES
 // ========================
-app.use("/images", express.static(path.join(__dirname, "images")));
+app.use("/api/apples", appleRoutes);
 
 // ========================
 // SETTINGS ROUTES
@@ -204,14 +147,11 @@ app.listen(PORT, () => {
   console.log(`📱 User Auth API: http://localhost:${PORT}/api/auth`);
   console.log(`👨‍💼 Admin Login: http://localhost:${PORT}/api/admin/login`);
   console.log(`📊 Admin Dashboard API: http://localhost:${PORT}/api/admin/pending-requests`);
-  console.log(`📊 Admin Dashboard API: http://localhost:${PORT}/api/admin/admins`);
-  console.log(`🍎 Apple API: http://localhost:${PORT}/api/apples\n`); // ✅ NEW: Add this line
+  console.log(`🍎 Apple API: http://localhost:${PORT}/api/apples\n`);
 });
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
   console.error('❌ Unhandled Promise Rejection:', err);
-  // Close server & exit process
   process.exit(1);
 });
-

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login, signup, adminLogin } from "../services/authService";
+import ForgotPasswordModal from "./ForgotPasswordModal";
 import "../styles/SignupLogin.css";
 
 export default function SignupLogin() {
@@ -12,7 +13,7 @@ export default function SignupLogin() {
     name: "",
     dob: "",
   });
-  const [forgotPassword, setForgotPassword] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   
@@ -32,21 +33,20 @@ export default function SignupLogin() {
     setLoading(true);
 
     try {
-      if (forgotPassword) {
-        alert("Password reset link sent to your email!");
-        setForgotPassword(false);
-        setLoading(false);
-        return;
-      }
-
       // ============ ADMIN MODE ============
       if (isAdminMode) {
         if (isLogin) {
           const response = await adminLogin(formData.email, formData.password);
           
-          if (response.token) {
+          console.log('Admin login response:', response);
+          
+          if (response && response.token) {
+            localStorage.setItem("authToken", response.token);
+            localStorage.setItem("admin", JSON.stringify(response.admin));
             alert("Admin login successful!");
             navigate("/dashboard");
+          } else {
+            throw new Error("Admin login failed - no token received");
           }
         } else {
           const response = await fetch("http://localhost:5000/api/admin/signup-request", {
@@ -76,9 +76,15 @@ export default function SignupLogin() {
         if (isLogin) {
           const response = await login(formData.email, formData.password);
           
-          if (response.success) {
+          console.log('User login response:', response);
+          
+          if (response && response.success && response.token) {
+            localStorage.setItem("authToken", response.token);
+            localStorage.setItem("user", JSON.stringify(response.user));
             alert(`Hello You, ${response.user.name || response.user.email}!`);
             navigate("/user-dashboard");
+          } else {
+            throw new Error(response.error || "Login failed - no token received");
           }
         } else {
           const response = await signup(
@@ -87,10 +93,14 @@ export default function SignupLogin() {
             formData.name
           );
           
-          if (response.success) {
+          console.log('Signup response:', response);
+          
+          if (response && response.success) {
             alert("Signup successful! Please login.");
             setIsLogin(true);
             setFormData({ email: formData.email, password: "", name: "", dob: "" });
+          } else {
+            throw new Error(response.error || "Signup failed");
           }
         }
       }
@@ -104,7 +114,6 @@ export default function SignupLogin() {
 
   const toggleMode = () => {
     setIsLogin(!isLogin);
-    setForgotPassword(false);
     setError("");
     setFormData({ email: "", password: "", name: "", dob: "" });
   };
@@ -112,18 +121,28 @@ export default function SignupLogin() {
   const toggleAdminMode = () => {
     setIsAdminMode(!isAdminMode);
     setIsLogin(true);
-    setForgotPassword(false);
     setError("");
     setFormData({ email: "", password: "", name: "", dob: "" });
+  };
+
+  const handleForgotPasswordSuccess = (response) => {
+    localStorage.setItem("authToken", response.token);
+    if (isAdminMode) {
+      localStorage.setItem("admin", JSON.stringify(response.user));
+      alert(`Welcome back, ${response.user.name || response.user.email}!`);
+      navigate("/dashboard");
+    } else {
+      localStorage.setItem("user", JSON.stringify(response.user));
+      alert(`Welcome back, ${response.user.name || response.user.email}!`);
+      navigate("/user-dashboard");
+    }
   };
 
   return (
     <div className="auth-container">
       <div className="auth-card">
         <h2>
-          {forgotPassword
-            ? "Forgot Password"
-            : isAdminMode && !isLogin
+          {isAdminMode && !isLogin
             ? "Request Admin Access 👨‍💼"
             : isAdminMode
             ? "Admin Login 👨‍💼"
@@ -135,7 +154,7 @@ export default function SignupLogin() {
         {error && <div className="error-message">{error}</div>}
 
         <form onSubmit={handleSubmit}>
-          {!isLogin && !forgotPassword && (
+          {!isLogin && (
             <input
               type="text"
               name="name"
@@ -146,7 +165,7 @@ export default function SignupLogin() {
             />
           )}
 
-          {!isLogin && !forgotPassword && isAdminMode && (
+          {!isLogin && isAdminMode && (
             <input
               type="date"
               name="dob"
@@ -166,23 +185,19 @@ export default function SignupLogin() {
             required
           />
 
-          {!forgotPassword && (
-            <input
-              type="password"
-              name="password"
-              placeholder="Password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              minLength={6}
-            />
-          )}
+          <input
+            type="password"
+            name="password"
+            placeholder="Password"
+            value={formData.password}
+            onChange={handleChange}
+            required
+            minLength={6}
+          />
 
           <button type="submit" className="auth-btn" disabled={loading}>
             {loading
               ? "Processing..."
-              : forgotPassword
-              ? "Send Reset Link"
               : isAdminMode && !isLogin
               ? "Request Admin Access"
               : isAdminMode
@@ -194,42 +209,39 @@ export default function SignupLogin() {
         </form>
 
         <div className="auth-links">
-          {!forgotPassword && isLogin && !isAdminMode && (
-            <p onClick={() => setForgotPassword(true)} className="link">
+          {isLogin && (
+            <p onClick={() => setShowForgotModal(true)} className="link">
               Forgot Password?
             </p>
           )}
 
-          {forgotPassword && (
-            <p onClick={() => setForgotPassword(false)} className="link">
-              Back to Login
-            </p>
-          )}
+          <p>
+            {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
+            <span className="link" onClick={toggleMode}>
+              {isLogin ? "Sign Up" : "Login"}
+            </span>
+          </p>
 
-          {!forgotPassword && (
-            <p>
-              {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-              <span className="link" onClick={toggleMode}>
-                {isLogin ? "Sign Up" : "Login"}
+          <p className="admin-toggle">
+            {isAdminMode ? (
+              <span className="link" onClick={toggleAdminMode}>
+                ← Regular User {isLogin ? "Login" : "Signup"}
               </span>
-            </p>
-          )}
-
-          {!forgotPassword && (
-            <p className="admin-toggle">
-              {isAdminMode ? (
-                <span className="link" onClick={toggleAdminMode}>
-                  ← Regular User {isLogin ? "Login" : "Signup"}
-                </span>
-              ) : (
-                <span className="link" onClick={toggleAdminMode}>
-                  Admin {isLogin ? "Login" : "Signup"} →
-                </span>
-              )}
-            </p>
-          )}
+            ) : (
+              <span className="link" onClick={toggleAdminMode}>
+                Admin {isLogin ? "Login" : "Signup"} →
+              </span>
+            )}
+          </p>
         </div>
       </div>
+
+      <ForgotPasswordModal 
+        isOpen={showForgotModal}
+        onClose={() => setShowForgotModal(false)}
+        onSuccess={handleForgotPasswordSuccess}
+        userType={isAdminMode ? "admin" : "user"}
+      />
     </div>
   );
 }

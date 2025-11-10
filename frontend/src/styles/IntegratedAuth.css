@@ -1,0 +1,154 @@
+/* ========================
+   INTEGRATED AUTH STYLES
+   Additional styles for combined password/passwordless auth
+   ======================== */
+
+/* Divider between auth methods */
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 20px 0;
+  color: #999;
+  font-size: 14px;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.divider span {
+  padding: 0 15px;
+  font-weight: 500;
+}
+
+/* Passwordless switch button */
+.passwordless-switch-btn {
+  width: 100%;
+  padding: 12px;
+  background: white;
+  color: #667eea;
+  border: 2px solid #667eea;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+}
+
+.passwordless-switch-btn:hover {
+  background: #667eea;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.passwordless-switch-btn.secondary {
+  background: transparent;
+  color: #666;
+  border: 2px solid #ddd;
+  font-size: 14px;
+  padding: 10px;
+}
+
+.passwordless-switch-btn.secondary:hover {
+  background: #f5f5f5;
+  color: #333;
+  border-color: #999;
+}
+
+/* OTP input styling for integrated component */
+.auth-card .otp-input {
+  text-align: center;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: 8px;
+  font-family: monospace;
+}
+
+/* Success and error messages */
+.auth-card .error-message,
+.auth-card .success-message {
+  animation: slideDown 0.3s ease;
+}
+
+/* Subtitle text */
+.auth-card .subtitle {
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+  margin: 0 0 25px 0;
+  line-height: 1.5;
+}
+
+.auth-card .subtitle strong {
+  color: #667eea;
+  font-weight: 600;
+}
+
+/* Disabled link styling */
+.disabled-link {
+  color: #999;
+  cursor: not-allowed;
+  font-weight: 600;
+}
+
+/* Loading state improvements */
+.auth-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  color: #999;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .passwordless-switch-btn {
+    font-size: 14px;
+    padding: 10px;
+  }
+
+  .divider {
+    font-size: 12px;
+  }
+
+  .auth-card .otp-input {
+    font-size: 20px;
+    letter-spacing: 6px;
+  }
+}
+
+/* Smooth transitions */
+.auth-card {
+  transition: all 0.3s ease;
+}
+
+/* Focus states for accessibility */
+.passwordless-switch-btn:focus-visible {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+/* Animation for method switching */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-card form {
+  animation: fadeIn 0.3s ease;
+}

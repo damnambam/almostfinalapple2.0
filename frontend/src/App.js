@@ -15,7 +15,7 @@ import CreateApple from './pages/CreateApple';
 import SingleApple from './pages/SingleApple';
 import SignupLogin from "./pages/SignupLogin";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-
+import IntegratedAuth from './components/IntegratedAuth';
 
 import './App.css';
 
@@ -120,6 +120,7 @@ function App() {
       <Routes>
         {/* 🔐 Auth Pages */}
         <Route path="/signup-login" element={<SignupLogin setIsAdmin={setIsAdmin} />} />
+        <Route path="/login" element={<IntegratedAuth />} />
 
         {/* ⚙️ Settings Page (Protected for all logged-in users) */}
         <Route

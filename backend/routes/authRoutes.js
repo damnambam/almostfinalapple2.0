@@ -1,113 +1,76 @@
-// routes/authRoutes.js
-// Authentication routes for regular users (not admins)
-
 import express from 'express';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import User from '../models/User.js';
 
 const router = express.Router();
 
-// Import User model - adjust path based on your structure
-let User;
-try {
-  const userModel = await import('../models/User.js');
-  User = userModel.User || userModel.default;
-} catch (err) {
-  console.error('❌ Failed to import User model:', err.message);
-}
-
 // ========================
-// SIGNUP (Register new user)
+// USER SIGNUP
 // ========================
 router.post('/signup', async (req, res) => {
   try {
     const { email, password, name } = req.body;
 
-    console.log('📝 User signup attempt:', email);
-
-    // Validate inputs
-    if (!email || !password || !name) {
+    // Validation
+    if (!email || !password) {
       return res.status(400).json({ 
         success: false,
-        message: 'All fields are required: email, password, and name.' 
+        message: "Email and password are required" 
       });
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Invalid email format.' 
-      });
-    }
-
-    // Validate password length
     if (password.length < 6) {
       return res.status(400).json({ 
         success: false,
-        message: 'Password must be at least 6 characters long.' 
-      });
-    }
-
-    if (!User) {
-      return res.status(500).json({ 
-        success: false,
-        message: 'User model not configured.' 
+        message: "Password must be at least 6 characters" 
       });
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ 
         success: false,
-        message: 'Email already registered.' 
+        message: "User already exists" 
       });
     }
 
     // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create new user
     const newUser = new User({
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
+      email,
       password: hashedPassword,
-      createdAt: new Date()
+      name: name || '',
+      isActive: true
     });
 
     await newUser.save();
 
-    // Generate token (simple version - you can use JWT)
-    const token = `user-${newUser._id}-${Date.now()}`;
-
-    console.log('✅ User created successfully:', email);
+    console.log('✅ New user created:', email);
 
     res.status(201).json({
       success: true,
-      message: 'Signup successful!',
-      token: token,
+      message: "User created successfully",
       user: {
         id: newUser._id,
-        name: newUser.name,
         email: newUser.email,
-        createdAt: newUser.createdAt
+        name: newUser.name
       }
     });
+
   } catch (error) {
     console.error('❌ Signup error:', error);
     res.status(500).json({ 
       success: false,
-      message: 'Signup failed. Please try again.',
-      error: error.message
+      message: "Server error during signup" 
     });
   }
 });
 
 // ========================
-// LOGIN
+// USER LOGIN
 // ========================
 router.post('/login', async (req, res) => {
   try {
@@ -115,134 +78,95 @@ router.post('/login', async (req, res) => {
 
     console.log('🔐 User login attempt:', email);
 
-    // Validate inputs
     if (!email || !password) {
       return res.status(400).json({ 
         success: false,
-        message: 'Email and password are required.' 
-      });
-    }
-
-    if (!User) {
-      return res.status(500).json({ 
-        success: false,
-        message: 'User model not configured.' 
+        message: "Email and password required" 
       });
     }
 
     // Find user
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email });
     if (!user) {
       console.log('❌ User not found:', email);
       return res.status(401).json({ 
         success: false,
-        message: 'Invalid email or password.' 
+        message: "Invalid credentials" 
       });
     }
 
-    // Check if account is active (if your model has this field)
-    if (user.isActive === false) {
+    // Check if active
+    if (!user.isActive) {
       console.log('❌ User account is inactive:', email);
       return res.status(401).json({ 
         success: false,
-        message: 'Account is inactive. Please contact support.' 
+        message: "Account is inactive" 
       });
     }
 
     // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      console.log('❌ Invalid password for user:', email);
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      console.log('❌ Password mismatch for:', email);
       return res.status(401).json({ 
         success: false,
-        message: 'Invalid email or password.' 
+        message: "Invalid credentials" 
       });
     }
 
-    // Update last login (if your model has this field)
-    if (user.lastLogin !== undefined) {
-      user.lastLogin = new Date();
-      await user.save();
-    }
+    // Update last login
+    user.lastLogin = new Date();
+    await user.save();
 
-    // Generate token (simple version - you can use JWT)
+    // Generate token
     const token = `user-${user._id}-${Date.now()}`;
 
-    console.log('✅ User login successful:', email);
+    console.log('✅ Successful login for', email);
+    console.log('🔑 Token generated:', token);
 
     res.json({
       success: true,
-      message: 'Login successful!',
       token: token,
       user: {
         id: user._id,
-        name: user.name,
         email: user.email,
-        dob: user.dob,
-        createdAt: user.createdAt
+        name: user.name,
+        profilePicture: user.profilePicture
       }
     });
+
   } catch (error) {
     console.error('❌ Login error:', error);
     res.status(500).json({ 
       success: false,
-      message: 'Login failed. Please try again.',
-      error: error.message
+      message: "Server error during login" 
     });
   }
 });
 
 // ========================
-// LOGOUT (Optional - mainly clears token on frontend)
+// GET USER PROFILE
 // ========================
-router.post('/logout', (req, res) => {
-  console.log('👋 User logout');
-  res.json({
-    success: true,
-    message: 'Logged out successfully!'
-  });
-});
-
-// ========================
-// VERIFY TOKEN (Check if token is valid)
-// ========================
-router.get('/verify', async (req, res) => {
+router.get('/profile', async (req, res) => {
   try {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
+    const token = req.headers.authorization?.split(' ')[1];
+    
     if (!token) {
       return res.status(401).json({ 
         success: false,
-        message: 'No token provided.' 
+        message: "No token provided" 
       });
     }
 
-    // Extract user ID from token
-    let userId;
-    if (token.startsWith('user-')) {
-      const parts = token.split('-');
-      userId = parts[1];
-    } else {
-      return res.status(401).json({ 
-        success: false,
-        message: 'Invalid token format.' 
-      });
-    }
+    // Extract user ID from token (format: user-{id}-{timestamp})
+    const userId = token.split('-')[1];
 
-    if (!User) {
-      return res.status(500).json({ 
-        success: false,
-        message: 'User model not configured.' 
-      });
-    }
-
-    // Find user
     const user = await User.findById(userId).select('-password');
+    
     if (!user) {
       return res.status(404).json({ 
         success: false,
-        message: 'User not found.' 
+        message: "User not found" 
       });
     }
 
@@ -250,122 +174,157 @@ router.get('/verify', async (req, res) => {
       success: true,
       user: {
         id: user._id,
-        name: user.name,
         email: user.email,
-        dob: user.dob,
-        createdAt: user.createdAt
+        name: user.name,
+        profilePicture: user.profilePicture
       }
     });
-  } catch (error) {
-    console.error('❌ Token verification error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Token verification failed.',
-      error: error.message
-    });
-  }
-});
 
-// ========================
-// GET USER PROFILE BY ID (for compatibility)
-// ========================
-router.get('/profile/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    if (!User) {
-      return res.status(500).json({ 
-        success: false,
-        message: 'User model not configured.' 
-      });
-    }
-
-    const user = await User.findById(userId).select('-password');
-    if (!user) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'User not found.' 
-      });
-    }
-
-    res.json({
-      success: true,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        dob: user.dob,
-        createdAt: user.createdAt
-      }
-    });
   } catch (error) {
     console.error('❌ Get profile error:', error);
     res.status(500).json({ 
       success: false,
-      message: 'Failed to fetch profile.',
-      error: error.message
+      message: "Server error" 
     });
   }
 });
 
 // ========================
-// FORGOT PASSWORD (Optional - send reset email)
+// UPDATE USER PROFILE
 // ========================
-router.post('/forgot-password', async (req, res) => {
+router.put('/profile', async (req, res) => {
   try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ 
+    const token = req.headers.authorization?.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({ 
         success: false,
-        message: 'Email is required.' 
+        message: "No token provided" 
       });
     }
 
-    if (!User) {
-      return res.status(500).json({ 
-        success: false,
-        message: 'User model not configured.' 
-      });
-    }
+    // Extract user ID from token
+    const userId = token.split('-')[1];
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const { name, email, profilePicture } = req.body;
+
+    const user = await User.findById(userId);
+    
     if (!user) {
-      // Don't reveal if email exists for security
-      return res.json({
-        success: true,
-        message: 'If an account exists with this email, a password reset link has been sent.'
+      return res.status(404).json({ 
+        success: false,
+        message: "User not found" 
       });
     }
 
-    // TODO: Generate reset token and send email
-    // For now, just log it
-    console.log('🔑 Password reset requested for:', email);
+    // Update fields
+    if (name !== undefined) user.name = name;
+    if (email !== undefined) {
+      // Check if new email is already taken
+      const existingUser = await User.findOne({ email, _id: { $ne: userId } });
+      if (existingUser) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Email already in use" 
+        });
+      }
+      user.email = email;
+    }
+    if (profilePicture !== undefined) user.profilePicture = profilePicture;
+
+    await user.save();
+
+    console.log('✅ Profile updated for:', user.email);
 
     res.json({
       success: true,
-      message: 'If an account exists with this email, a password reset link has been sent.'
+      message: "Profile updated successfully",
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        profilePicture: user.profilePicture
+      }
     });
+
   } catch (error) {
-    console.error('❌ Forgot password error:', error);
+    console.error('❌ Update profile error:', error);
     res.status(500).json({ 
       success: false,
-      message: 'Failed to process request.',
-      error: error.message
+      message: "Server error" 
     });
   }
 });
 
 // ========================
-// TEST ROUTE (Optional - for debugging)
+// CHANGE PASSWORD
 // ========================
-router.get('/test', (req, res) => {
-  res.json({ 
-    success: true,
-    message: 'Auth routes are working!',
-    timestamp: new Date()
-  });
+router.put('/change-password', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({ 
+        success: false,
+        message: "No token provided" 
+      });
+    }
+
+    // Extract user ID from token
+    const userId = token.split('-')[1];
+
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Current and new password required" 
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ 
+        success: false,
+        message: "New password must be at least 6 characters" 
+      });
+    }
+
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: "User not found" 
+      });
+    }
+
+    // Verify current password
+    const match = await bcrypt.compare(currentPassword, user.password);
+    if (!match) {
+      return res.status(401).json({ 
+        success: false,
+        message: "Current password is incorrect" 
+      });
+    }
+
+    // Hash and save new password
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    console.log('✅ Password changed for:', user.email);
+
+    res.json({
+      success: true,
+      message: "Password changed successfully"
+    });
+
+  } catch (error) {
+    console.error('❌ Change password error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error" 
+    });
+  }
 });
 
-// Export router as default (ES6)
 export default router;

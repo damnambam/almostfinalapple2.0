@@ -3,6 +3,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
+
 const router = express.Router();
 
 // Import models - adjust paths as needed
@@ -18,6 +19,8 @@ try {
 }
 
 // Middleware to verify token (works with simple tokens from your auth system)
+
+
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
